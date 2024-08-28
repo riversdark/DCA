@@ -11,6 +11,7 @@ import sys
 import timeit
 import argparse
 import subprocess
+import torch.cuda
 
 parser = argparse.ArgumentParser(description = "Learn a Potts model using Multiple Sequence Alignment data.")
 parser.add_argument("--input_dir",
@@ -23,6 +24,9 @@ parser.add_argument("--weight_decay",
                     type = float)
 parser.add_argument("--output_dir",
                     help = "output directory for saving the model")
+parser.add_argument("--batch_size", type=int, default=1000, help="Batch size for processing")
+parser.add_argument("--use_cpu", action="store_true", help="Use CPU instead of GPU")
+
 args = parser.parse_args()
 
 ## read msa
@@ -41,8 +45,11 @@ with open(weight_file_name, 'rb') as input_file_handle:
     seq_weight = pickle.load(input_file_handle)
 seq_weight = seq_weight.astype(np.float32)
 
-seq_msa_binary = torch.from_numpy(seq_msa_binary).cuda()
-seq_weight = torch.from_numpy(seq_weight).cuda()
+device = torch.device("cuda" if torch.cuda.is_available() and not args.use_cpu else "cpu")
+print(f"Using device: {device}")
+
+seq_msa_binary = torch.from_numpy(seq_msa_binary).to(device)
+seq_weight = torch.from_numpy(seq_weight).to(device)
 weight_decay = float(args.weight_decay)
 
 ## pseudolikelihood method for Potts model
@@ -50,7 +57,7 @@ _, len_seq, K = seq_msa_binary.shape
 num_node = len_seq * K
 
 seq_msa_binary = seq_msa_binary.reshape(-1, num_node)
-seq_msa_idx = torch.argmax(seq_msa_binary.reshape(-1,K), -1)
+seq_msa_idx = torch.argmax(seq_msa_binary.reshape(-1, K), -1).reshape(-1, len_seq)
 
 # h = seq_msa_binary.new_zeros(num_node, requires_grad = True)
 # J = seq_msa_binary.new_zeros((num_node, num_node), requires_grad = True)
@@ -64,26 +71,54 @@ def calc_loss_and_grad(parameter):
     J = parameter[0:num_node**2].reshape([num_node, num_node])
     h = parameter[num_node**2:]
     
-    J = torch.tensor(J, requires_grad = True, device = seq_msa_binary.device)
-    h = torch.tensor(h, requires_grad = True, device = seq_msa_binary.device)
+    J = torch.tensor(J, requires_grad=True, device=device)
+    h = torch.tensor(h, requires_grad=True, device=device)
     
-    logits = torch.matmul(seq_msa_binary, J*J_mask) + h
-    cross_entropy = nn.functional.cross_entropy(
-        input = logits.reshape((-1,K)),
-        target = seq_msa_idx,
-        reduce = False)
-    cross_entropy = torch.sum(cross_entropy.reshape((-1,len_seq)), -1)
-    cross_entropy = torch.sum(cross_entropy*seq_weight)
-    loss = cross_entropy + weight_decay*torch.sum((J*J_mask)**2)
+    batch_size = args.batch_size
+    num_batches = (seq_msa_binary.shape[0] + batch_size - 1) // batch_size
     
-    loss.backward()
-
-    grad_J = J.grad.cpu().numpy().copy()
-    grad_h = h.grad.cpu().numpy().copy()
-
+    total_loss = 0
+    total_grad_J = torch.zeros_like(J)
+    total_grad_h = torch.zeros_like(h)
+    
+    for i in range(num_batches):
+        start_idx = i * batch_size
+        end_idx = min((i + 1) * batch_size, seq_msa_binary.shape[0])
+        
+        batch_seq = seq_msa_binary[start_idx:end_idx]
+        batch_weight = seq_weight[start_idx:end_idx]
+        batch_idx = seq_msa_idx[start_idx:end_idx]
+        
+        logits = torch.matmul(batch_seq, J*J_mask) + h
+        
+        # Reshape logits and batch_idx for cross_entropy
+        logits_reshaped = logits.reshape(-1, K)
+        batch_idx_reshaped = batch_idx.reshape(-1)
+        
+        cross_entropy = nn.functional.cross_entropy(
+            input=logits_reshaped,
+            target=batch_idx_reshaped,
+            reduction='none'
+        )
+        cross_entropy = cross_entropy.reshape(-1, len_seq).sum(dim=1)
+        batch_loss = torch.sum(cross_entropy * batch_weight)
+        batch_loss += weight_decay * torch.sum((J*J_mask)**2)
+        
+        batch_loss.backward()
+        
+        total_loss += batch_loss.item()
+        total_grad_J += J.grad
+        total_grad_h += h.grad
+        
+        J.grad.zero_()
+        h.grad.zero_()
+    
+    grad_J = total_grad_J.cpu().numpy()
+    grad_h = total_grad_h.cpu().numpy()
+    
     grad = np.concatenate((grad_J.reshape(-1), grad_h))
     grad = grad.astype(np.float64)
-    return loss.item(), grad
+    return total_loss, grad
 
 init_param = np.zeros(num_node*num_node + num_node)
 #loss, grad = calc_loss_and_grad(init_param)
