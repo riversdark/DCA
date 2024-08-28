@@ -34,22 +34,27 @@ In this example, we first download a MSA from Pfam and use the MSA to train a Po
    ```
    python ./script/download_MSA.py --Pfam_id PF00041
    ```
+   TODO: database investigation.
 
 2. **Process the MSA.**
 
    The downloaded MSA can not be used directly to train the Potts model. It has to be processed into a specific format using `./script/process_MSA.py`. The query `TENA_HUMAN/804-884` is used as the reference sequence to clean up the MSA. The results are saved
    in directory `./pfam_msa/` and they include files `seq_msa_binary.pkl, seq_msa.pkl, seq_pos_idx.pkl, seq_weights.pkl`.
    ```
-   python ./script/process_MSA.py --msa_file ./pfam_msa/PF00041_full.txt --query_id TENA_HUMAN/804-884 --output_dir ./pfam_msa/
+   python ./script/process_MSA.py --msa_file ./pfam_msa/PF00041_full.txt --query_id A0A7K4UZQ6_9EMBE/901-989 --output_dir ./pfam_msa/
    ```
+
+   TODO: investigate the query ID issue. (the MSA seems to be changing.)
    
 
 3. **Learn the Potts model.**
 
    Here we set the hyperparameters for learning the Potts model: 200 for maximum num of optimization steps and 0.05 for weight decay factor. The resulting Potss model is saved as `./model/model_weight_decay_0.050.pkl`.
    ```
-   python ./script/Potts_model.py --input_dir ./pfam_msa/ --max_iter 200 --weight_decay 0.05 --output_dir ./model/
+   python ./script/Potts_model.py --input_dir ./pfam_msa/ --max_iter 200 --weight_decay 0.05 --output_dir ./model/ --batch_size 500
    ```
+
+   TODO: investigate GPU usage, since no matter the batch size is, the GPU usage is always the same.
 
 4. **Calculate and plot the interaction score.**
 
