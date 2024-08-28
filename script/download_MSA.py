@@ -18,7 +18,8 @@ pfam_id = args.Pfam_id
 
 print("Downloading the full multiple sequence alignment for Pfam: {0} ......".format(pfam_id))
 http = urllib3.PoolManager()
-r = http.request('GET', 'http://pfam.xfam.org/family/{0}/alignment/full/gzipped'.format(pfam_id))
+url = f"https://www.ebi.ac.uk/interpro/wwwapi//entry/pfam/{pfam_id}/?annotation=alignment:full&download"
+r = http.request('GET', url)
 data = gzip.decompress(r.data)
 data = data.decode()
 with open("./pfam_msa/{0}_full.txt".format(pfam_id), 'w') as file_handle:
