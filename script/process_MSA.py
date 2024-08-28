@@ -24,6 +24,23 @@ with open(args.msa_file, 'r') as file_handle:
         seq_id, seq = line.split()
         seq_dict[seq_id] = seq.upper()
 
+# Add debugging information
+print(f"Total sequences read: {len(seq_dict)}")
+print(f"First 5 sequence IDs: {list(seq_dict.keys())[:5]}")
+
+# Check if the query_id exists, if not, try to find a close match
+if args.query_id not in seq_dict:
+    print(f"Warning: Query ID '{args.query_id}' not found in the sequence dictionary.")
+    close_matches = [key for key in seq_dict.keys() if args.query_id.split('/')[0] in key]
+    if close_matches:
+        print(f"Found close matches: {close_matches}")
+        args.query_id = close_matches[0]
+        print(f"Using '{args.query_id}' as the query ID.")
+    else:
+        print("No close matches found. Please check your query ID and MSA file.")
+        print(f"Available IDs: {list(seq_dict.keys())[:10]}...")  # Print first 10 IDs
+        sys.exit(1)
+
 ## remove gaps in the query sequences
 query_seq = seq_dict[args.query_id] ## with gaps
 idx = [ s == "-" or s == "." for s in query_seq]
@@ -51,16 +68,18 @@ i = 1
 for a in aa:
     aa_index[a] = i
     i += 1
+# Add 'B' (Aspartic acid or Asparagine) and 'Z' (Glutamic acid or Glutamine) to aa_index
+aa_index['B'] = aa_index['D']  # Treat 'B' as Aspartic acid
+aa_index['Z'] = aa_index['E']  # Treat 'Z' as Glutamic acid
+aa_index['X'] = 0  # Treat 'X' (any amino acid) as a gap
+
 with open(args.output_dir + "/aa_index.pkl", 'wb') as file_handle:
     pickle.dump(aa_index, file_handle)
 
 seq_msa = []
 for k in seq_dict.keys():
-    if seq_dict[k].count('X') > 0 or seq_dict[k].count('Z') > 0:
-        continue
-    seq_msa.append([aa_index[s] for s in seq_dict[k]])
+    seq_msa.append([aa_index.get(s, 0) for s in seq_dict[k]])  # Use .get() with default 0
 seq_msa = np.array(seq_msa)
-
 
 ## remove positions where too many sequences have gaps
 pos_idx = []
