@@ -56,8 +56,8 @@ weight_decay = float(args.weight_decay)
 _, len_seq, K = seq_msa_binary.shape
 num_node = len_seq * K
 
-seq_msa_binary = seq_msa_binary.reshape(-1, num_node)
-seq_msa_idx = torch.argmax(seq_msa_binary.reshape(-1, K), -1).reshape(-1, len_seq)
+seq_msa_binary = seq_msa_binary.reshape(-1, num_node)  # dim: [num_sequences, num_node]
+seq_msa_idx = torch.argmax(seq_msa_binary.reshape(-1, K), -1).reshape(-1, len_seq)  # dim: [num_sequences, len_seq]
 
 # h = seq_msa_binary.new_zeros(num_node, requires_grad = True)
 # J = seq_msa_binary.new_zeros((num_node, num_node), requires_grad = True)
@@ -71,8 +71,8 @@ def calc_loss_and_grad(parameter):
     J = parameter[0:num_node**2].reshape([num_node, num_node])
     h = parameter[num_node**2:]
     
-    J = torch.tensor(J, requires_grad=True, device=device)
-    h = torch.tensor(h, requires_grad=True, device=device)
+    J = torch.tensor(J, requires_grad=True, device=device)  # dim: [num_node, num_node]
+    h = torch.tensor(h, requires_grad=True, device=device)  # dim: [num_node]
     
     batch_size = args.batch_size
     num_batches = (seq_msa_binary.shape[0] + batch_size - 1) // batch_size
@@ -85,24 +85,24 @@ def calc_loss_and_grad(parameter):
         start_idx = i * batch_size
         end_idx = min((i + 1) * batch_size, seq_msa_binary.shape[0])
         
-        batch_seq = seq_msa_binary[start_idx:end_idx]
-        batch_weight = seq_weight[start_idx:end_idx]
-        batch_idx = seq_msa_idx[start_idx:end_idx]
+        batch_seq = seq_msa_binary[start_idx:end_idx]  # dim: [batch_size, num_node]
+        batch_weight = seq_weight[start_idx:end_idx]  # dim: [batch_size]
+        batch_idx = seq_msa_idx[start_idx:end_idx]  # dim: [batch_size, len_seq]
         
-        logits = torch.matmul(batch_seq, J*J_mask) + h
+        logits = torch.matmul(batch_seq, J*J_mask) + h  # dim: [batch_size, num_node]
         
         # Reshape logits and batch_idx for cross_entropy
-        logits_reshaped = logits.reshape(-1, K)
-        batch_idx_reshaped = batch_idx.reshape(-1)
+        logits_reshaped = logits.reshape(-1, K)  # dim: [batch_size * len_seq, K]
+        batch_idx_reshaped = batch_idx.reshape(-1)  # dim: [batch_size * len_seq]
         
         cross_entropy = nn.functional.cross_entropy(
-            input=logits_reshaped,
-            target=batch_idx_reshaped,
+            input=logits_reshaped,  # dim: [batch_size * len_seq, K]
+            target=batch_idx_reshaped,  # dim: [batch_size * len_seq]
             reduction='none'
-        )
-        cross_entropy = cross_entropy.reshape(-1, len_seq).sum(dim=1)
-        batch_loss = torch.sum(cross_entropy * batch_weight)
-        batch_loss += weight_decay * torch.sum((J*J_mask)**2)
+        )  # dim: [batch_size * len_seq]
+        cross_entropy = cross_entropy.reshape(-1, len_seq).sum(dim=1)  # dim: [batch_size]
+        batch_loss = torch.sum(cross_entropy * batch_weight)  # scalar
+        batch_loss += weight_decay * torch.sum((J*J_mask)**2)  # weight decay
         
         batch_loss.backward()
         
