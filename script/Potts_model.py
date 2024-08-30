@@ -120,7 +120,7 @@ def calc_loss_and_grad(parameter):
     grad = grad.astype(np.float64)
     return total_loss, grad
 
-init_param = np.zeros(num_node*num_node + num_node)
+init_param = np.zeros(num_node*num_node + num_node) # dubious? terrible?
 #loss, grad = calc_loss_and_grad(init_param)
 param, f, d = optimize.fmin_l_bfgs_b(calc_loss_and_grad, init_param, iprint = True, maxiter = args.max_iter)
 J = param[0:num_node**2].reshape([num_node, num_node])
