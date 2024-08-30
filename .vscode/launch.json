@@ -1,0 +1,19 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug calc_score.py",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/script/calc_score.py",
+            "args": [
+                "--model_file", "./model/model_weight_decay_0.050.pkl",
+                "--N", "80"
+            ],
+            "cwd": "${workspaceFolder}",
+            "env": {},
+            "envFile": "${workspaceFolder}/.env",
+            "console": "integratedTerminal"
+        }
+    ]
+}

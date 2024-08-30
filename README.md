@@ -122,4 +122,4 @@ In this example, we first download a MSA from Pfam and use the MSA to train a Po
    - **Score Correction**: The scores are corrected by removing the mean interaction score for each position.
    - **Thresholding**: Scores for positions that are too close (within 4 positions) are set to \(-\infty\). The top 80 pairs of positions with the highest scores are selected as predicted contacts.
 
-   ![Figure](./output/contact_potts.png)
+   ![Figure](./output/contact_both.png)
