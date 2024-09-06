@@ -87,25 +87,25 @@ def calc_loss_and_grad(parameter):
         
         batch_seq = seq_msa_binary[start_idx:end_idx]  # dim: [batch_size, num_node]
         batch_weight = seq_weight[start_idx:end_idx]  # dim: [batch_size]
-        batch_idx = seq_msa_idx[start_idx:end_idx]  # dim: [batch_size, len_seq]
         
+        # Calculate energy for each sequence
         logits = torch.matmul(batch_seq, J*J_mask) + h  # dim: [batch_size, num_node]
+        energy = torch.sum(batch_seq * logits, dim=1)  # dim: [batch_size]
         
-        # Reshape logits and batch_idx for cross_entropy
-        logits_reshaped = logits.reshape(-1, K)  # dim: [batch_size * len_seq, K]
-        batch_idx_reshaped = batch_idx.reshape(-1)  # dim: [batch_size * len_seq]
+        # Calculate partition function (normalization constant)
+        all_states = torch.eye(K, device=device).repeat(len_seq, 1)  # dim: [num_node, K]
+        all_logits = torch.matmul(all_states, J*J_mask) + h  # dim: [num_node, K]
+        all_energies = torch.sum(all_states * all_logits, dim=1)  # dim: [num_node]
+        Z = torch.sum(torch.exp(-all_energies.reshape(len_seq, K)), dim=1)  # dim: [len_seq]
+        log_Z = torch.sum(torch.log(Z))  # scalar
         
-        cross_entropy = nn.functional.cross_entropy(
-            input=logits_reshaped,  # dim: [batch_size * len_seq, K]
-            target=batch_idx_reshaped,  # dim: [batch_size * len_seq]
-            reduction='none'
-        )  # dim: [batch_size * len_seq]
-        cross_entropy = cross_entropy.reshape(-1, len_seq).sum(dim=1)  # dim: [batch_size]
-        batch_loss = torch.sum(cross_entropy * batch_weight)  # scalar
+        # Calculate full likelihood
+        log_likelihood = -energy - log_Z  # dim: [batch_size]
+        batch_loss = -torch.sum(log_likelihood * batch_weight)  # scalar
         batch_loss += weight_decay * torch.sum((J*J_mask)**2)  # weight decay
         
         batch_loss.backward()
-        
+
         total_loss += batch_loss.item()
         total_grad_J += J.grad
         total_grad_h += h.grad
