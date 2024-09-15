@@ -2,13 +2,16 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug calc_score.py",
+            "name": "Debug Potts_model.py",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceFolder}/script/calc_score.py",
+            "program": "${workspaceFolder}/script/Potts_model.py",
             "args": [
-                "--model_file", "./model/model_weight_decay_0.050.pkl",
-                "--N", "80"
+                "--input_dir", "pfam_msa/fake",
+                "--max_iter", "100",
+                "--weight_decay", "0.01",
+                "--output_dir", "model/fake/",
+                "--full_likelihood"
             ],
             "cwd": "${workspaceFolder}",
             "env": {},
