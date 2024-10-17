@@ -73,7 +73,7 @@ In this example, we first download a MSA from Pfam and use the MSA to train a Po
    Here we set the hyperparameters for learning the Potts model: 200 for maximum number of optimization steps, 0.05 for weight decay factor, and a batch size of 500. The resulting Potts model is saved as `./model/model_weight_decay_0.050.pkl`.
 
    ```
-   python ./script/Potts_model.py --input_dir ./pfam_msa/ --max_iter 200 --weight_decay 0.05 --output_dir ./model/ --batch_size 500
+   python ./script/Potts_model.py --input_dir ./pfam_msa/ --max_iter 200 --weight_decay 0.05 --output_dir ./model/ 
    ```
 
    The Potts model is a statistical physics model used in Direct Coupling Analysis (DCA) to capture co-evolutionary relationships between amino acid positions in a protein sequence. It models the probability distribution of sequences in the Multiple Sequence Alignment (MSA).
@@ -102,8 +102,6 @@ In this example, we first download a MSA from Pfam and use the MSA to train a Po
    After training, the learned parameters `J` and `h` can be used to predict contacts between residues in the protein structure, generate new sequences, or assess the probability of sequences under the model.
 
    Note: The current implementation accumulates gradients across all batches before updating parameters. This approach may be memory-intensive for very large datasets.
-
-   TODO: Investigate GPU usage optimization, as current batch size doesn't seem to affect GPU utilization.
 
 4. **Calculate and plot the interaction score.**
 
